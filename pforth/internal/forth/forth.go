@@ -189,3 +189,57 @@ func (f *Forth) Allot(n int) {
 func (f *Forth) Here() int {
 	return f.DP
 }
+
+func (f *Forth) Emit(c byte) {
+	f.Output.Write([]byte{c})
+}
+
+func (f *Forth) EmitStr(s string) {
+	f.Output.Write([]byte(s))
+}
+
+func (f *Forth) EmitCR() {
+	f.EmitStr("\r\n")
+}
+
+func (f *Forth) ReadLine() (string, error) {
+	line, err := f.bufIn.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	line = strings.TrimRight(line, "\r\n")
+	return line, nil
+}
+
+func (f *Forth) isDelim(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
+}
+
+func (f *Forth) parseWord() (string, bool) {
+	for f.IN < len(f.TIB) && f.isDelim(f.TIB[f.IN]) {
+		f.IN++
+	}
+	if f.IN >= len(f.TIB) {
+		return "", false
+	}
+	start := f.IN
+	for f.IN < len(f.TIB) && !f.isDelim(f.TIB[f.IN]) {
+		f.IN++
+	}
+	return string(f.TIB[start:f.IN]), true
+}
+
+func (f *Forth) parseString() string {
+	for f.IN < len(f.TIB) && f.TIB[f.IN] == ' ' {
+		f.IN++
+	}
+	var s strings.Builder
+	for f.IN < len(f.TIB) && f.TIB[f.IN] != '"' {
+		s.WriteByte(f.TIB[f.IN])
+		f.IN++
+	}
+	if f.IN < len(f.TIB) && f.TIB[f.IN] == '"' {
+		f.IN++
+	}
+	return s.String()
+}
