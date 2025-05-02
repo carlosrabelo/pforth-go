@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"io"
 	"strings"
+	"sync/atomic"
+	"unicode"
 )
 
 type Forth struct {
@@ -242,4 +244,128 @@ func (f *Forth) parseString() string {
 		f.IN++
 	}
 	return s.String()
+}
+
+func (f *Forth) interpretNumber(token string) bool {
+	token = strings.TrimSpace(token)
+	if len(token) == 0 {
+		return false
+	}
+
+	base := f.Base
+	if base <= 0 {
+		base = 10
+	}
+
+	neg := false
+	start := 0
+
+	if token[0] == '-' {
+		neg = true
+		start = 1
+	}
+
+	if start >= len(token) {
+		return false
+	}
+
+	var val Cell
+	parsedBase := base
+
+	if token[start] == '$' {
+		parsedBase = 16
+		start++
+	} else if token[start] == '%' {
+		parsedBase = 2
+		start++
+	} else if token[start] == '#' {
+		start++
+		if start < len(token) && token[start] == '#' {
+			start++
+		}
+	}
+
+	if start >= len(token) {
+		return false
+	}
+
+	for _, c := range token[start:] {
+		var digit Cell
+		switch {
+		case unicode.IsDigit(c):
+			digit = Cell(c - '0')
+		case c >= 'A' && c <= 'F':
+			digit = Cell(c - 'A' + 10)
+		case c >= 'a' && c <= 'f':
+			digit = Cell(c - 'a' + 10)
+		default:
+			return false
+		}
+		if digit >= Cell(parsedBase) {
+			return false
+		}
+		val = val*Cell(parsedBase) + digit
+	}
+
+	if neg {
+		val = -val
+	}
+
+	if f.State {
+		litXT, _ := f.FindXT("LIT")
+		f.compileList = append(f.compileList, Cell(litXT))
+		f.compileList = append(f.compileList, val)
+	} else {
+		f.DSPush(val)
+	}
+	return true
+}
+
+func (f *Forth) interpretLoop() {
+	for {
+		if atomic.LoadInt32(&f.Interrupted) != 0 {
+			atomic.StoreInt32(&f.Interrupted, 0)
+			forthError("INTERRUPTED")
+		}
+		token, ok := f.parseWord()
+		if !ok {
+			break
+		}
+		upper := strings.ToUpper(token)
+		w, found := f.Lookup(upper)
+		if found {
+			if f.State && !w.Immediate {
+				xt, _ := f.FindXT(upper)
+				f.compileList = append(f.compileList, Cell(xt))
+			} else {
+				xt, _ := f.FindXT(upper)
+				f.ExecuteWord(xt)
+			}
+		} else if f.interpretNumber(token) {
+		} else {
+			f.EmitStr(token)
+			f.EmitStr(" ?\r\n")
+			f.State = false
+			return
+		}
+	}
+}
+
+// ExecuteWord is a primitive-only stub; the full engine lands later.
+func (f *Forth) ExecuteWord(xt int) {
+	if xt < 0 || xt >= len(f.Words) {
+		forthError("INVALID XT: %d", xt)
+	}
+	w := f.Words[xt]
+	if w.Type == WordPrimitive && w.Code != nil {
+		w.Code(f)
+		return
+	}
+	forthError("UNIMPLEMENTED WORD TYPE")
+}
+
+func (f *Forth) InterpretLine(line string) {
+	f.TIB = []byte(line + "\r")
+	f.IN = 0
+	f.interpretLoop()
 }
