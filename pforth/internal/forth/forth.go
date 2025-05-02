@@ -142,3 +142,50 @@ func (f *Forth) LatestWord() *Word {
 	}
 	return f.Words[f.Latest]
 }
+
+func (f *Forth) Fetch(addr int) Cell {
+	if addr < 0 || addr+1 >= len(f.Memory) {
+		forthError("FETCH ADDR OUT OF RANGE: %d", addr)
+	}
+	return Cell(int(f.Memory[addr]) | int(f.Memory[addr+1])<<8)
+}
+
+func (f *Forth) Store(addr int, val Cell) {
+	if addr < 0 || addr+1 >= len(f.Memory) {
+		forthError("STORE ADDR OUT OF RANGE: %d", addr)
+	}
+	f.Memory[addr] = byte(val)
+	f.Memory[addr+1] = byte(val >> 8)
+}
+
+func (f *Forth) CFetch(addr int) byte {
+	if addr < 0 || addr >= len(f.Memory) {
+		forthError("C@ ADDR OUT OF RANGE: %d", addr)
+	}
+	return f.Memory[addr]
+}
+
+func (f *Forth) CStore(addr int, val byte) {
+	if addr < 0 || addr >= len(f.Memory) {
+		forthError("C! ADDR OUT OF RANGE: %d", addr)
+	}
+	f.Memory[addr] = val
+}
+
+func (f *Forth) Comma(val Cell) {
+	f.Store(f.DP, val)
+	f.DP += 2
+}
+
+func (f *Forth) CComma(val byte) {
+	f.CStore(f.DP, val)
+	f.DP++
+}
+
+func (f *Forth) Allot(n int) {
+	f.DP += n
+}
+
+func (f *Forth) Here() int {
+	return f.DP
+}
