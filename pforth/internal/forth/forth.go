@@ -351,21 +351,3 @@ func (f *Forth) interpretLoop() {
 	}
 }
 
-// ExecuteWord is a primitive-only stub; the full engine lands later.
-func (f *Forth) ExecuteWord(xt int) {
-	if xt < 0 || xt >= len(f.Words) {
-		forthError("INVALID XT: %d", xt)
-	}
-	w := f.Words[xt]
-	if w.Type == WordPrimitive && w.Code != nil {
-		w.Code(f)
-		return
-	}
-	forthError("UNIMPLEMENTED WORD TYPE")
-}
-
-func (f *Forth) InterpretLine(line string) {
-	f.TIB = []byte(line + "\r")
-	f.IN = 0
-	f.interpretLoop()
-}

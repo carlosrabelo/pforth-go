@@ -3,6 +3,7 @@ package forth
 import (
 	"bytes"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -39,4 +40,15 @@ func TestSTATEResetOnError(t *testing.T) {
 	if f.State {
 		t.Errorf("STATE should be false after undefined word error")
 	}
+}
+
+func TestInterrupt(t *testing.T) {
+	f, _ := newTestForth("")
+	atomic.StoreInt32(&f.Interrupted, 1)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected interrupt")
+		}
+	}()
+	f.InterpretLine("0")
 }
