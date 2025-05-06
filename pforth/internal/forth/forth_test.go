@@ -173,6 +173,92 @@ func TestDEPTH(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreAndFetch(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(12345)
+	f.DSPush(2000)
+	exec(f, "!")
+	f.DSPush(2000)
+	exec(f, "@")
+	if f.DSPop() != 12345 {
+		t.Errorf("@/!: expected 12345, got %d", f.DSPop())
+	}
+}
+
+func TestMemoryCStoreCFetch(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(255)
+	f.DSPush(3000)
+	exec(f, "C!")
+	f.DSPush(3000)
+	exec(f, "C@")
+	if f.DSPop() != 255 {
+		t.Errorf("C@/C!: expected 255, got %d", f.DSPop())
+	}
+}
+
+func TestMemoryFILL(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(5000)
+	f.DSPush(5)
+	f.DSPush(65) // 'A'
+	exec(f, "FILL")
+	for i := 0; i < 5; i++ {
+		if f.CFetch(5000+i) != 65 {
+			t.Errorf("FILL[%d]: expected 65", i)
+		}
+	}
+}
+
+func TestMemoryCMOVE(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 5; i++ {
+		f.CStore(7000+i, byte(i+10))
+	}
+	f.DSPush(7005)
+	f.DSPush(7000)
+	f.DSPush(5)
+	exec(f, "CMOVE")
+	for i := 0; i < 5; i++ {
+		if f.CFetch(7005+i) != byte(i+10) {
+			t.Errorf("CMOVE[%d]: expected %d, got %d", i, i+10, f.CFetch(7005+i))
+		}
+	}
+}
+
+func TestCMOVE(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 5; i++ {
+		f.CStore(8000+i, byte(i+10))
+	}
+	// Non-overlapping copy: src=8000, dst=8010, len=5
+	f.DSPush(8010)
+	f.DSPush(8000)
+	f.DSPush(5)
+	exec(f, "CMOVE")
+	for i := 0; i < 5; i++ {
+		if f.CFetch(8010+i) != byte(i+10) {
+			t.Errorf("CMOVE[%d]: expected %d", i, i+10)
+		}
+	}
+}
+
+func TestCMOVEOverlap(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 5; i++ {
+		f.CStore(8000+i, byte(i+20))
+	}
+	// Forward src < dst: propagates first byte
+	f.DSPush(8001)
+	f.DSPush(8000)
+	f.DSPush(4)
+	exec(f, "CMOVE")
+	// After forward CMOVE with src<dst: all copied bytes get src[0]
+	if f.CFetch(8001) != 20 || f.CFetch(8002) != 20 {
+		t.Errorf("CMOVE fwd: expected first-byte propagation")
+	}
+}
+
 func TestHexPrefix(t *testing.T) {
 	f, _ := newTestForth("")
 	f.InterpretLine("$FF")
