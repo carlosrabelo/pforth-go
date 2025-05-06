@@ -25,6 +25,22 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive("ALLOT", allot)
 	f.DefinePrimitive(",", comma)
 	f.DefinePrimitive("C,", ccomma)
+
+	f.DefinePrimitive("+", plus)
+	f.DefinePrimitive("-", minus)
+	f.DefinePrimitive("*", star)
+	f.DefinePrimitive("/MOD", slashmod)
+	f.DefinePrimitive("U<=", ulteq)
+	f.DefinePrimitive("U>=", ugteq)
+	f.DefinePrimitive("AND", andop)
+	f.DefinePrimitive("OR", orop)
+	f.DefinePrimitive("XOR", xorop)
+	f.DefinePrimitive("INVERT", invert)
+	f.DefinePrimitive("=", eq)
+	f.DefinePrimitive("<", lt)
+	f.DefinePrimitive(">", gt)
+	f.DefinePrimitive("U<", ult)
+	f.DefinePrimitive("U>", ugt)
 }
 
 var dup = func(f *Forth) {
@@ -172,4 +188,127 @@ var comma = func(f *Forth) {
 var ccomma = func(f *Forth) {
 	val := byte(f.DSPop())
 	f.CComma(val)
+}
+
+var plus = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(a + b)
+}
+
+var minus = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(b - a)
+}
+
+var star = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(a * b)
+}
+
+var slashmod = func(f *Forth) {
+	div := f.DSPop()
+	num := f.DSPop()
+	if div == 0 {
+		forthError("DIVISION BY ZERO")
+	}
+	quot := num / div
+	rem := num % div
+	f.DSPush(rem)
+	f.DSPush(quot)
+}
+
+var ulteq = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if uint(b) <= uint(a) {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var ugteq = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if uint(b) >= uint(a) {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var andop = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(a & b)
+}
+
+var orop = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(a | b)
+}
+
+var xorop = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	f.DSPush(a ^ b)
+}
+
+var invert = func(f *Forth) {
+	v := f.DSPop()
+	f.DSPush(^v)
+}
+
+var eq = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if b == a {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var lt = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if b < a {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var gt = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if b > a {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var ult = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if uint(b) < uint(a) {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var ugt = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	if uint(b) > uint(a) {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
 }

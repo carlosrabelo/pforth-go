@@ -173,6 +173,82 @@ func TestDEPTH(t *testing.T) {
 	}
 }
 
+func TestArithmetic(t *testing.T) {
+	tests := []struct {
+		name   string
+		word   string
+		inputs []Cell
+		want   Cell
+	}{
+		{"+", "+", []Cell{10, 20}, 30},
+		{"-", "-", []Cell{20, 5}, 15},
+		{"*", "*", []Cell{6, 7}, 42},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, _ := newTestForth("")
+			for _, v := range tt.inputs {
+				f.DSPush(v)
+			}
+			exec(f, tt.word)
+			got := f.DSPop()
+			if got != tt.want {
+				t.Errorf("%s: expected %d, got %d", tt.name, tt.want, got)
+			}
+		})
+	}
+}
+
+func TestDIVMOD(t *testing.T) {
+	f, _ := newTestForth("")
+	// /MOD: ( dividend divisor -- rem quot )
+	// 10 / 3 = 3 remainder 1
+	f.DSPush(10)
+	f.DSPush(3)
+	exec(f, "/MOD")
+	quot := f.DSPop()
+	rem := f.DSPop()
+	if rem != 1 || quot != 3 {
+		t.Errorf("/MOD: expected rem=1 quot=3, got rem=%d quot=%d", rem, quot)
+	}
+}
+
+func TestComparison(t *testing.T) {
+	tests := []struct {
+		name string
+		word string
+		push []Cell
+		want Cell
+	}{
+		{"=", "=", []Cell{5, 5}, -1},
+		{"= false", "=", []Cell{5, 6}, 0},
+		{"< true", "<", []Cell{3, 5}, -1},
+		{"< false", "<", []Cell{5, 3}, 0},
+		{"> true", ">", []Cell{5, 3}, -1},
+		{"> false", ">", []Cell{3, 5}, 0},
+		{"AND", "AND", []Cell{3, 1}, 1},
+		{"OR", "OR", []Cell{1, 2}, 3},
+		{"XOR", "XOR", []Cell{3, 1}, 2},
+		{"INVERT", "INVERT", []Cell{0}, -1},
+		{"INVERT all", "INVERT", []Cell{-1}, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, _ := newTestForth("")
+			for _, v := range tt.push {
+				f.DSPush(v)
+			}
+			exec(f, tt.word)
+			got := f.DSPop()
+			if got != tt.want {
+				t.Errorf("%s: expected %d, got %d", tt.name, tt.want, got)
+			}
+		})
+	}
+}
+
 func TestMemoryStoreAndFetch(t *testing.T) {
 	f, _ := newTestForth("")
 	f.DSPush(12345)
