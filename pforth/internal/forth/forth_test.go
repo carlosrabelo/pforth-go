@@ -351,6 +351,50 @@ func TestBinaryPrefix(t *testing.T) {
 	}
 }
 
+func TestEVALUATE(t *testing.T) {
+	f, out := newTestForth("")
+	// Store "2 3 + ." in memory
+	s := "2 3 + ."
+	addr := f.Here()
+	for i := 0; i < len(s); i++ {
+		f.CStore(addr+i, s[i])
+	}
+	f.DP = addr + len(s)
+	f.DSPush(Cell(addr))
+	f.DSPush(Cell(len(s)))
+	exec(f, "EVALUATE")
+	if !strings.Contains(out.String(), "5") {
+		t.Errorf("EVALUATE: expected '5' output, got %q", out.String())
+	}
+}
+
+func TestSPAN(t *testing.T) {
+	f, _ := newTestForth("hello\n")
+	f.DSPush(5000) // buffer address
+	f.DSPush(80)   // max length
+	f.InterpretLine("EXPECT")
+	exec(f, "SPAN", "@")
+	span := f.DSPop()
+	if span != 5 {
+		t.Errorf("SPAN: expected 5, got %d", span)
+	}
+}
+
+func TestABORT(t *testing.T) {
+	f, _ := newTestForth("")
+	f.State = true
+	f.DSPush(10)
+	f.Body = []Cell{1, 2, 3}
+	f.IP = 1
+	exec(f, "ABORT")
+	if f.State {
+		t.Errorf("ABORT: STATE should be false")
+	}
+	if len(f.DS) != 0 {
+		t.Errorf("ABORT: DS should be empty")
+	}
+}
+
 func TestBYE(t *testing.T) {
 	f, _ := newTestForth("")
 	exec(f, "BYE")

@@ -2,6 +2,7 @@ package forth
 
 import (
 	"strconv"
+	"unicode"
 )
 
 func initPrimitives(f *Forth) {
@@ -54,6 +55,19 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive("U.", udot)
 	f.DefinePrimitive("BYE", bye)
 	f.DefinePrimitive(".S", dots)
+
+	f.DefinePrimitive("WORD", word)
+	f.DefinePrimitive("FIND", find)
+	f.DefinePrimitive("EXECUTE", execute)
+	f.DefinePrimitive("INTERPRET", interpret)
+	f.DefinePrimitive("QUIT", quit)
+	f.DefinePrimitive("ABORT", abortw)
+	f.DefinePrimitive("EXPECT", expect)
+	f.DefinePrimitive("EVALUATE", evaluate)
+	f.DefinePrimitive("BASE", base)
+	f.DefinePrimitive("DP", dpaddr)
+	f.DefinePrimitive("SPAN", span)
+	f.DefinePrimitive("SOURCE", source)
 }
 
 var dup = func(f *Forth) {
@@ -381,4 +395,115 @@ var dots = func(f *Forth) {
 		}
 	}
 	f.EmitStr(">")
+}
+
+var word = func(f *Forth) {
+	delim := byte(f.DSPop())
+	for f.IN < len(f.TIB) && f.TIB[f.IN] == delim {
+		f.IN++
+	}
+	if f.IN >= len(f.TIB) {
+		f.CStore(f.Here(), 0)
+		f.DSPush(Cell(f.Here()))
+		return
+	}
+	start := f.Here() + 1
+	count := 0
+	for f.IN < len(f.TIB) &&
+		f.TIB[f.IN] != delim &&
+		f.TIB[f.IN] != '\r' &&
+		f.TIB[f.IN] != '\n' {
+		f.CStore(start+count, f.TIB[f.IN])
+		count++
+		f.IN++
+	}
+	f.CStore(f.Here(), byte(count))
+	f.CStore(start+count, ' ')
+	f.DSPush(Cell(f.Here()))
+}
+
+var find = func(f *Forth) {
+	addr := int(f.DSPop())
+	length := int(f.CFetch(addr))
+	nameBytes := make([]byte, length)
+	for i := 0; i < length; i++ {
+		nameBytes[i] = byte(unicode.ToUpper(rune(f.CFetch(addr + 1 + i))))
+	}
+	name := string(nameBytes)
+	if _, ok := f.Lookup(name); !ok {
+		f.DSPush(Cell(addr))
+		f.DSPush(0)
+		return
+	}
+	xt, _ := f.FindXT(name)
+	f.DSPush(Cell(xt))
+	f.DSPush(1)
+}
+
+var execute = func(f *Forth) {
+	xt := int(f.DSPop())
+	f.ExecuteWord(xt)
+}
+
+var interpret = func(f *Forth) {
+	f.interpretLoop()
+}
+
+var quit = func(f *Forth) {
+	f.QUIT()
+}
+
+var abortw = func(f *Forth) {
+	f.Abort()
+}
+
+var expect = func(f *Forth) {
+	maxlen := int(f.DSPop())
+	addr := int(f.DSPop())
+	line, err := f.ReadLine()
+	if err != nil {
+		return
+	}
+	count := len(line)
+	if count > maxlen {
+		count = maxlen
+	}
+	for i := 0; i < count; i++ {
+		f.CStore(addr+i, line[i])
+	}
+	f.CStore(addr+count, 0)
+	f.Store(1000, Cell(count))
+}
+
+var evaluate = func(f *Forth) {
+	len := int(f.DSPop())
+	addr := int(f.DSPop())
+	savedTIB := f.TIB
+	savedIN := f.IN
+	line := make([]byte, len)
+	for i := 0; i < len; i++ {
+		line[i] = f.CFetch(addr + i)
+	}
+	f.TIB = line
+	f.IN = 0
+	f.interpretLoop()
+	f.TIB = savedTIB
+	f.IN = savedIN
+}
+
+var base = func(f *Forth) {
+	f.DSPush(Cell(f.Base))
+}
+
+var dpaddr = func(f *Forth) {
+	f.DSPush(Cell(f.DP))
+}
+
+var span = func(f *Forth) {
+	f.DSPush(1000)
+}
+
+var source = func(f *Forth) {
+	f.DSPush(Cell(len(f.TIB)))
+	f.DSPush(0)
 }
