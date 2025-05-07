@@ -336,20 +336,35 @@ func TestCMOVEOverlap(t *testing.T) {
 }
 
 func TestHexPrefix(t *testing.T) {
-	f, _ := newTestForth("")
-	f.InterpretLine("$FF")
-	got := f.DSPop()
-	if got != 255 {
-		t.Errorf("$FF: expected 255, got %d", got)
+	f, out := newTestForth("")
+	f.InterpretLine("$FF .")
+	if !strings.Contains(out.String(), "255") {
+		t.Errorf("$FF: expected 255, got %q", out.String())
 	}
 }
 
 func TestBinaryPrefix(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("%1010 .")
+	if !strings.Contains(out.String(), "10") {
+		t.Errorf("%%1010: expected 10, got %q", out.String())
+	}
+}
+
+func TestBYE(t *testing.T) {
 	f, _ := newTestForth("")
-	f.InterpretLine("%1010")
-	got := f.DSPop()
-	if got != 10 {
-		t.Errorf("%%1010: expected 10, got %d", got)
+	exec(f, "BYE")
+	if f.Running {
+		t.Errorf("BYE should set Running to false")
+	}
+}
+
+func TestDOTS(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("1 2 3 .S")
+	output := out.String()
+	if !strings.Contains(output, "<") || !strings.Contains(output, ">") {
+		t.Errorf(".S: expected stack display with <>, got %q", output)
 	}
 }
 

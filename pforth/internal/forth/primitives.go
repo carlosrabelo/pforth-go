@@ -1,5 +1,9 @@
 package forth
 
+import (
+	"strconv"
+)
+
 func initPrimitives(f *Forth) {
 	f.DefinePrimitive("DUP", dup)
 	f.DefinePrimitive("DROP", drop)
@@ -41,6 +45,15 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive(">", gt)
 	f.DefinePrimitive("U<", ult)
 	f.DefinePrimitive("U>", ugt)
+
+	f.DefinePrimitive("KEY", key)
+	f.DefinePrimitive("EMIT", emit)
+	f.DefinePrimitive("CR", cr)
+	f.DefinePrimitive("TYPE", typeof)
+	f.DefinePrimitive(".", dot)
+	f.DefinePrimitive("U.", udot)
+	f.DefinePrimitive("BYE", bye)
+	f.DefinePrimitive(".S", dots)
 }
 
 var dup = func(f *Forth) {
@@ -311,4 +324,61 @@ var ugt = func(f *Forth) {
 	} else {
 		f.DSPush(0)
 	}
+}
+
+var key = func(f *Forth) {
+	b, err := f.bufIn.ReadByte()
+	if err != nil {
+		f.DSPush(0)
+		return
+	}
+	f.DSPush(Cell(b))
+}
+
+var emit = func(f *Forth) {
+	c := byte(f.DSPop())
+	f.Emit(c)
+}
+
+var cr = func(f *Forth) {
+	f.EmitCR()
+}
+
+var typeof = func(f *Forth) {
+	length := int(f.DSPop())
+	addr := int(f.DSPop())
+	for i := 0; i < length; i++ {
+		f.Emit(f.CFetch(addr + i))
+	}
+}
+
+var dot = func(f *Forth) {
+	n := f.DSPop()
+	s := strconv.FormatInt(int64(n), 10)
+	f.EmitStr(s)
+	f.Emit(' ')
+}
+
+var udot = func(f *Forth) {
+	n := f.DSPop()
+	s := strconv.FormatUint(uint64(n), 10)
+	f.EmitStr(s)
+	f.Emit(' ')
+}
+
+var bye = func(f *Forth) {
+	f.Running = false
+}
+
+var dots = func(f *Forth) {
+	f.EmitStr("<")
+	depth := len(f.DS)
+	for i := depth - 1; i >= 0; i-- {
+		s := strconv.FormatInt(int64(f.DS[i]), 10)
+		f.EmitStr(s)
+		if i > 0 {
+			f.Emit(' ')
+		}
+	}
+	f.EmitStr(">")
 }
