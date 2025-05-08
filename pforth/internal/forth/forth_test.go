@@ -412,9 +412,95 @@ func TestDOTS(t *testing.T) {
 	}
 }
 
+func TestCOLON(t *testing.T) {
+	f, _ := newTestForth("")
+	f.InterpretLine(": DOUBLE DUP + ;")
+	w, found := f.Lookup("DOUBLE")
+	if !found {
+		t.Fatal("DOUBLE not found after definition")
+	}
+	if w.Type != WordColon {
+		t.Errorf("DOUBLE: expected colon type, got %v", w.Type)
+	}
+}
+
+func TestColonDefinitionAndExecution(t *testing.T) {
+	f2, out := newTestForth("")
+	f2.InterpretLine(": SQUARE DUP * ;")
+	f2.InterpretLine("5 SQUARE .")
+	if !strings.Contains(out.String(), "25") {
+		t.Errorf("SQUARE: expected 25, got %q", out.String())
+	}
+}
+
+func TestVARIABLE(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("VARIABLE X")
+	f.InterpretLine("42 X !")
+	f.InterpretLine("X @ .")
+	if !strings.Contains(out.String(), "42") {
+		t.Errorf("VARIABLE: expected 42, got %q", out.String())
+	}
+}
+
+func TestCONSTANT(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("42 CONSTANT ANSWER")
+	f.InterpretLine("ANSWER .")
+	if !strings.Contains(out.String(), "42") {
+		t.Errorf("CONSTANT: expected 42, got %q", out.String())
+	}
+}
+
+func TestCREATE(t *testing.T) {
+	f, _ := newTestForth("")
+	f.InterpretLine("CREATE FOO")
+	if _, ok := f.Lookup("FOO"); !ok {
+		t.Errorf("CREATE: FOO not found")
+	}
+}
+
+func TestTICK(t *testing.T) {
+	f, _ := newTestForth("")
+	xtDUP, ok := f.FindXT("DUP")
+	if !ok {
+		t.Fatal("DUP not found in dictionary")
+	}
+	f.InterpretLine("' DUP")
+	if f.DSPop() != Cell(xtDUP) {
+		t.Errorf("': expected XT=%d, got %d", xtDUP, f.DSPop())
+	}
+}
+
+func TestDOTQUOTE(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(".\" hello\"")
+	if !strings.Contains(out.String(), "hello") {
+		t.Errorf(".\" : expected 'hello', got %q", out.String())
+	}
+}
+
+func TestDOTQUOTECompile(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": SAYHELLO .\" hello from def\" ;")
+	f.InterpretLine("SAYHELLO")
+	if !strings.Contains(out.String(), "hello from def") {
+		t.Errorf(".\" compiled: expected 'hello from def', got %q", out.String())
+	}
+}
+
+func TestSQUOTECompile(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": HELLO S\" hello\" TYPE ;")
+	f.InterpretLine("HELLO")
+	if !strings.Contains(out.String(), "hello") {
+		t.Errorf("S\" compiled: expected 'hello', got %q", out.String())
+	}
+}
+
 func TestSTATEResetOnError(t *testing.T) {
 	f, out := newTestForth("")
-	f.InterpretLine("UNDEFINED")
+	f.InterpretLine(": TEST UNDEFINED ;")
 	if !strings.Contains(out.String(), "?") {
 		t.Errorf("Expected error on undefined word")
 	}

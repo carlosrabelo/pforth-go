@@ -2,6 +2,7 @@ package forth
 
 import (
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -68,6 +69,27 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive("DP", dpaddr)
 	f.DefinePrimitive("SPAN", span)
 	f.DefinePrimitive("SOURCE", source)
+
+	f.DefinePrimitive("LIT", lit)
+	f.DefinePrimitive("EXIT", exitword)
+
+	f.DefinePrimitive(":", colon)
+	f.DefineImmediate(";", semicolon)
+	f.DefineImmediate("[", lbracket)
+	f.DefineImmediate("]", rbracket)
+	f.DefinePrimitive("STATE", state)
+	f.DefinePrimitive("CREATE", create)
+	f.DefinePrimitive("CONSTANT", constant)
+	f.DefinePrimitive("VARIABLE", variable)
+	f.DefineImmediate("IMMEDIATE", immediate)
+	f.DefineImmediate("[COMPILE]", bracketcompile)
+	f.DefineImmediate("LITERAL", literal)
+	f.DefineImmediate(".\"", dotstring)
+	f.DefineImmediate("S\"", sstring)
+	f.DefineImmediate("(", parenword)
+	f.DefinePrimitive(">BODY", tobody)
+	f.DefinePrimitive("'", tick)
+	f.DefineImmediate("RECURSE", recurse)
 }
 
 var dup = func(f *Forth) {
@@ -506,4 +528,197 @@ var span = func(f *Forth) {
 var source = func(f *Forth) {
 	f.DSPush(Cell(len(f.TIB)))
 	f.DSPush(0)
+}
+
+var lit = func(f *Forth) {
+	val := f.Body[f.IP]
+	f.IP++
+	f.DSPush(val)
+}
+
+var exitword = func(f *Forth) {
+	f.IP = len(f.Body)
+}
+
+var colon = func(f *Forth) {
+	if f.State {
+		forthError("ALREADY COMPILING")
+	}
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	f.compileName = token
+	f.State = true
+	f.compileList = make([]Cell, 0, 64)
+	f.compileWord = f.DefineWord(token, WordColon, nil, nil, false)
+}
+
+var semicolon = func(f *Forth) {
+	if !f.State {
+		forthError("NOT IN COMPILATION STATE")
+	}
+	exitXT, _ := f.FindXT("EXIT")
+	f.compileList = append(f.compileList, Cell(exitXT))
+	f.State = false
+	bodyCopy := make([]Cell, len(f.compileList))
+	copy(bodyCopy, f.compileList)
+	if f.compileWord != nil {
+		f.compileWord.Body = bodyCopy
+	}
+	f.compileList = f.compileList[:0]
+	f.compileWord = nil
+}
+
+var lbracket = func(f *Forth) {
+	f.State = false
+}
+
+var rbracket = func(f *Forth) {
+	f.State = true
+}
+
+var state = func(f *Forth) {
+	if f.State {
+		f.DSPush(-1)
+	} else {
+		f.DSPush(0)
+	}
+}
+
+var create = func(f *Forth) {
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	f.DefineWord(strings.ToUpper(token), WordCreate, nil, nil, false)
+}
+
+var constant = func(f *Forth) {
+	val := f.DSPop()
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	f.DefineWord(strings.ToUpper(token), WordConstant, nil, []Cell{val}, false)
+}
+
+var variable = func(f *Forth) {
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	w := f.DefineWord(strings.ToUpper(token), WordVariable, nil, nil, false)
+	f.Store(w.PFA, 0)
+	f.DP = w.PFA + 2
+}
+
+var immediate = func(f *Forth) {
+	w := f.LatestWord()
+	if w != nil {
+		w.Immediate = true
+	}
+}
+
+var bracketcompile = func(f *Forth) {
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	w, found := f.Lookup(strings.ToUpper(token))
+	if !found {
+		f.EmitStr(token)
+		f.EmitStr(" ?\r\n")
+		return
+	}
+	_ = w
+	xt, _ := f.FindXT(strings.ToUpper(token))
+	f.compileList = append(f.compileList, Cell(xt))
+}
+
+var literal = func(f *Forth) {
+	val := f.DSPop()
+	litXT, _ := f.FindXT("LIT")
+	f.compileList = append(f.compileList, Cell(litXT))
+	f.compileList = append(f.compileList, val)
+}
+
+var tobody = func(f *Forth) {
+	addr := int(f.DSPop())
+	f.DSPush(Cell(addr + 2))
+}
+
+var parenword = func(f *Forth) {
+	for f.IN < len(f.TIB) && f.TIB[f.IN] != ')' {
+		f.IN++
+	}
+	if f.IN < len(f.TIB) {
+		f.IN++
+	}
+}
+
+var dotstring = func(f *Forth) {
+	s := f.parseString()
+	if f.State {
+		addr := f.Here()
+		for i := 0; i < len(s); i++ {
+			f.CStore(addr+i, s[i])
+		}
+		f.DP = addr + len(s)
+		litXT, _ := f.FindXT("LIT")
+		f.compileList = append(f.compileList, Cell(litXT))
+		f.compileList = append(f.compileList, Cell(addr))
+		f.compileList = append(f.compileList, Cell(litXT))
+		f.compileList = append(f.compileList, Cell(len(s)))
+		typeXT, _ := f.FindXT("TYPE")
+		f.compileList = append(f.compileList, Cell(typeXT))
+	} else {
+		f.EmitStr(s)
+	}
+}
+
+var sstring = func(f *Forth) {
+	s := f.parseString()
+	if f.State {
+		addr := f.Here()
+		for i := 0; i < len(s); i++ {
+			f.CStore(addr+i, s[i])
+		}
+		f.DP = addr + len(s)
+		litXT, _ := f.FindXT("LIT")
+		f.compileList = append(f.compileList, Cell(litXT))
+		f.compileList = append(f.compileList, Cell(addr))
+		f.compileList = append(f.compileList, Cell(litXT))
+		f.compileList = append(f.compileList, Cell(len(s)))
+	} else {
+		addr := f.Here()
+		for i := 0; i < len(s); i++ {
+			f.CStore(addr+i, s[i])
+		}
+		f.DP = addr + len(s)
+		f.DSPush(Cell(addr))
+		f.DSPush(Cell(len(s)))
+	}
+}
+
+var tick = func(f *Forth) {
+	token, ok := f.parseWord()
+	if !ok {
+		forthError("WORD NAME EXPECTED")
+	}
+	w, found := f.Lookup(strings.ToUpper(token))
+	if !found {
+		forthError("WORD NOT FOUND: %s", token)
+	}
+	_ = w
+	xt, _ := f.FindXT(strings.ToUpper(token))
+	f.DSPush(Cell(xt))
+}
+
+var recurse = func(f *Forth) {
+	if !f.State {
+		forthError("RECURSE ONLY IN COMPILATION")
+	}
+	xt := len(f.Words) - 1
+	f.compileList = append(f.compileList, Cell(xt))
 }
