@@ -90,6 +90,18 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive(">BODY", tobody)
 	f.DefinePrimitive("'", tick)
 	f.DefineImmediate("RECURSE", recurse)
+
+	f.DefinePrimitive("BRANCH", branch)
+	f.DefinePrimitive("0BRANCH", zerobranch)
+
+	f.DefineImmediate("IF", ifword)
+	f.DefineImmediate("THEN", thenword)
+	f.DefineImmediate("ELSE", elseword)
+	f.DefineImmediate("BEGIN", beginword)
+	f.DefineImmediate("UNTIL", untilword)
+	f.DefineImmediate("AGAIN", againword)
+	f.DefineImmediate("WHILE", whileword)
+	f.DefineImmediate("REPEAT", repeatword)
 }
 
 var dup = func(f *Forth) {
@@ -721,4 +733,107 @@ var recurse = func(f *Forth) {
 	}
 	xt := len(f.Words) - 1
 	f.compileList = append(f.compileList, Cell(xt))
+}
+
+var branch = func(f *Forth) {
+	offset := int(f.Body[f.IP])
+	f.IP += offset
+}
+
+var zerobranch = func(f *Forth) {
+	flag := f.DSPop()
+	offset := int(f.Body[f.IP])
+	if flag == 0 {
+		f.IP += offset
+	} else {
+		f.IP++
+	}
+}
+
+var ifword = func(f *Forth) {
+	if !f.State {
+		forthError("IF ONLY IN COMPILATION")
+	}
+	xt, _ := f.FindXT("0BRANCH")
+	f.compileList = append(f.compileList, Cell(xt))
+	f.compileList = append(f.compileList, 0)
+	f.DSPush(Cell(len(f.compileList) - 1))
+}
+
+var thenword = func(f *Forth) {
+	if !f.State {
+		forthError("THEN ONLY IN COMPILATION")
+	}
+	pos := int(f.DSPop())
+	offset := Cell(len(f.compileList) - pos)
+	f.compileList[pos] = offset
+}
+
+var elseword = func(f *Forth) {
+	if !f.State {
+		forthError("ELSE ONLY IN COMPILATION")
+	}
+	branchXT, _ := f.FindXT("BRANCH")
+	f.compileList = append(f.compileList, Cell(branchXT))
+	f.compileList = append(f.compileList, 0)
+	pos2 := len(f.compileList) - 1
+	pos1 := int(f.DSPop())
+	offset1 := Cell(pos2 + 1 - pos1)
+	f.compileList[pos1] = offset1
+	f.DSPush(Cell(pos2))
+}
+
+var beginword = func(f *Forth) {
+	if !f.State {
+		forthError("BEGIN ONLY IN COMPILATION")
+	}
+	f.DSPush(Cell(len(f.compileList)))
+}
+
+var untilword = func(f *Forth) {
+	if !f.State {
+		forthError("UNTIL ONLY IN COMPILATION")
+	}
+	dest := int(f.DSPop())
+	xt, _ := f.FindXT("0BRANCH")
+	f.compileList = append(f.compileList, Cell(xt))
+	offset := Cell(dest - len(f.compileList))
+	f.compileList = append(f.compileList, offset)
+}
+
+var againword = func(f *Forth) {
+	if !f.State {
+		forthError("AGAIN ONLY IN COMPILATION")
+	}
+	dest := int(f.DSPop())
+	xt, _ := f.FindXT("BRANCH")
+	f.compileList = append(f.compileList, Cell(xt))
+	offset := Cell(dest - len(f.compileList))
+	f.compileList = append(f.compileList, offset)
+}
+
+var whileword = func(f *Forth) {
+	if !f.State {
+		forthError("WHILE ONLY IN COMPILATION")
+	}
+	dest := int(f.DSPop())
+	xt, _ := f.FindXT("0BRANCH")
+	f.compileList = append(f.compileList, Cell(xt))
+	f.compileList = append(f.compileList, 0)
+	f.DSPush(Cell(dest))
+	f.DSPush(Cell(len(f.compileList) - 1))
+}
+
+var repeatword = func(f *Forth) {
+	if !f.State {
+		forthError("REPEAT ONLY IN COMPILATION")
+	}
+	orig := int(f.DSPop())
+	dest := int(f.DSPop())
+	branchXT, _ := f.FindXT("BRANCH")
+	f.compileList = append(f.compileList, Cell(branchXT))
+	back := Cell(dest - len(f.compileList))
+	f.compileList = append(f.compileList, back)
+	forward := Cell(len(f.compileList) - orig)
+	f.compileList[orig] = forward
 }

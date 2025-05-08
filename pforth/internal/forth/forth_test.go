@@ -412,6 +412,20 @@ func TestDOTS(t *testing.T) {
 	}
 }
 
+func TestIFELSE(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": TEST IF .\" YES\" ELSE .\" NO\" THEN ;")
+	f.InterpretLine("1 TEST")
+	f.InterpretLine("0 TEST")
+	output := out.String()
+	if !strings.Contains(output, "YES") {
+		t.Errorf("1 TEST should print YES, got %q", output)
+	}
+	if !strings.Contains(output, "NO") {
+		t.Errorf("0 TEST should print NO, got %q", output)
+	}
+}
+
 func TestCOLON(t *testing.T) {
 	f, _ := newTestForth("")
 	f.InterpretLine(": DOUBLE DUP + ;")
