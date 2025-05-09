@@ -412,6 +412,36 @@ func TestDOTS(t *testing.T) {
 	}
 }
 
+func TestDOLOOP(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": TEST 5 0 DO I . LOOP ;")
+	f.InterpretLine("TEST")
+	output := out.String()
+	if !strings.Contains(output, "0 1 2 3 4") {
+		t.Errorf("DO/LOOP: expected 0 1 2 3 4, got %q", output)
+	}
+}
+
+func TestPLUSLOOP(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": TEST 10 0 DO I . 3 +LOOP ;")
+	f.InterpretLine("TEST")
+	output := out.String()
+	if !strings.Contains(output, "0 3 6 9") {
+		t.Errorf("+LOOP: expected 0 3 6 9, got %q", output)
+	}
+}
+
+func TestNestedDOLOOP(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": TEST 3 0 DO 3 0 DO J . I . LOOP LOOP ;")
+	f.InterpretLine("TEST")
+	output := out.String()
+	if !strings.Contains(output, "0 0") || !strings.Contains(output, "2 2") {
+		t.Errorf("nested DO/LOOP output: %q", output)
+	}
+}
+
 func TestIFELSE(t *testing.T) {
 	f, out := newTestForth("")
 	f.InterpretLine(": TEST IF .\" YES\" ELSE .\" NO\" THEN ;")

@@ -102,6 +102,18 @@ func initPrimitives(f *Forth) {
 	f.DefineImmediate("AGAIN", againword)
 	f.DefineImmediate("WHILE", whileword)
 	f.DefineImmediate("REPEAT", repeatword)
+
+	f.DefinePrimitive("(DO)", dorun)
+	f.DefinePrimitive("(LOOP)", looprun)
+	f.DefinePrimitive("(+LOOP)", pluslooprun)
+	f.DefinePrimitive("I", iword)
+	f.DefinePrimitive("J", jword)
+	f.DefinePrimitive("UNLOOP", unloop)
+
+	f.DefineImmediate("DO", doword)
+	f.DefineImmediate("LOOP", loopword)
+	f.DefineImmediate("+LOOP", plusloopword)
+	f.DefineImmediate("LEAVE", leaveword)
 }
 
 var dup = func(f *Forth) {
@@ -836,4 +848,97 @@ var repeatword = func(f *Forth) {
 	f.compileList = append(f.compileList, back)
 	forward := Cell(len(f.compileList) - orig)
 	f.compileList[orig] = forward
+}
+
+var dorun = func(f *Forth) {
+	start := f.DSPop()
+	limit := f.DSPop()
+	f.RSPush(limit)
+	f.RSPush(start)
+}
+
+var looprun = func(f *Forth) {
+	index := f.RSPop()
+	limit := f.RSPop()
+	index++
+	if index < limit {
+		f.RSPush(limit)
+		f.RSPush(index)
+		offset := int(f.Body[f.IP])
+		f.IP += offset
+	} else {
+		f.IP++
+	}
+}
+
+var pluslooprun = func(f *Forth) {
+	step := f.DSPop()
+	index := f.RSPop()
+	limit := f.RSPop()
+	index += step
+	if (step > 0 && index >= limit) || (step < 0 && index <= limit) {
+		f.IP++
+	} else {
+		f.RSPush(limit)
+		f.RSPush(index)
+		offset := int(f.Body[f.IP])
+		f.IP += offset
+	}
+}
+
+var iword = func(f *Forth) {
+	ix := f.RSPeek()
+	f.DSPush(ix)
+}
+
+var jword = func(f *Forth) {
+	if len(f.RS) < 4 {
+		forthError("J: NOT ENOUGH LOOP LEVELS")
+	}
+	ix := f.RS[len(f.RS)-3]
+	f.DSPush(ix)
+}
+
+var unloop = func(f *Forth) {
+	f.RSPop()
+	f.RSPop()
+}
+
+var doword = func(f *Forth) {
+	if !f.State {
+		forthError("DO ONLY IN COMPILATION")
+	}
+	xt, _ := f.FindXT("(DO)")
+	f.compileList = append(f.compileList, Cell(xt))
+	f.DSPush(Cell(len(f.compileList)))
+}
+
+var loopword = func(f *Forth) {
+	if !f.State {
+		forthError("LOOP ONLY IN COMPILATION")
+	}
+	dest := int(f.DSPop())
+	xt, _ := f.FindXT("(LOOP)")
+	f.compileList = append(f.compileList, Cell(xt))
+	offset := Cell(dest - len(f.compileList))
+	f.compileList = append(f.compileList, offset)
+}
+
+var plusloopword = func(f *Forth) {
+	if !f.State {
+		forthError("+LOOP ONLY IN COMPILATION")
+	}
+	dest := int(f.DSPop())
+	xt, _ := f.FindXT("(+LOOP)")
+	f.compileList = append(f.compileList, Cell(xt))
+	offset := Cell(dest - len(f.compileList))
+	f.compileList = append(f.compileList, offset)
+}
+
+var leaveword = func(f *Forth) {
+	if !f.State {
+		forthError("LEAVE ONLY IN COMPILATION")
+	}
+	xt, _ := f.FindXT("UNLOOP")
+	f.compileList = append(f.compileList, Cell(xt))
 }
