@@ -15,22 +15,11 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive(">R", tor)
 	f.DefinePrimitive("R>", fromr)
 	f.DefinePrimitive("R@", rfetch)
-	f.DefinePrimitive("2SWAP", twoswap)
-	f.DefinePrimitive("2OVER", twover)
-	f.DefinePrimitive("DEPTH", depth)
 
 	f.DefinePrimitive("@", fetch)
 	f.DefinePrimitive("!", store)
 	f.DefinePrimitive("C@", cfetch)
 	f.DefinePrimitive("C!", cstore)
-	f.DefinePrimitive("FILL", fill)
-	f.DefinePrimitive("CMOVE", cmove)
-	f.DefinePrimitive("CMOVE>", cmover)
-	f.DefinePrimitive("HERE", here)
-	f.DefinePrimitive("PAD", pad)
-	f.DefinePrimitive("ALLOT", allot)
-	f.DefinePrimitive(",", comma)
-	f.DefinePrimitive("C,", ccomma)
 
 	f.DefinePrimitive("+", plus)
 	f.DefinePrimitive("-", minus)
@@ -38,6 +27,7 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive("/MOD", slashmod)
 	f.DefinePrimitive("U<=", ulteq)
 	f.DefinePrimitive("U>=", ugteq)
+
 	f.DefinePrimitive("AND", andop)
 	f.DefinePrimitive("OR", orop)
 	f.DefinePrimitive("XOR", xorop)
@@ -55,7 +45,6 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive(".", dot)
 	f.DefinePrimitive("U.", udot)
 	f.DefinePrimitive("BYE", bye)
-	f.DefinePrimitive(".S", dots)
 
 	f.DefinePrimitive("WORD", word)
 	f.DefinePrimitive("FIND", find)
@@ -64,11 +53,14 @@ func initPrimitives(f *Forth) {
 	f.DefinePrimitive("QUIT", quit)
 	f.DefinePrimitive("ABORT", abortw)
 	f.DefinePrimitive("EXPECT", expect)
+	f.DefinePrimitive(".S", dots)
+	f.DefinePrimitive("2SWAP", twoswap)
+	f.DefinePrimitive("2OVER", twover)
+	f.DefinePrimitive("FILL", fill)
+	f.DefinePrimitive("CMOVE", cmove)
+	f.DefinePrimitive("CMOVE>", cmover)
 	f.DefinePrimitive("EVALUATE", evaluate)
-	f.DefinePrimitive("BASE", base)
-	f.DefinePrimitive("DP", dpaddr)
-	f.DefinePrimitive("SPAN", span)
-	f.DefinePrimitive("SOURCE", source)
+	f.DefinePrimitive("INCLUDED", includedWord)
 
 	f.DefinePrimitive("LIT", lit)
 	f.DefinePrimitive("EXIT", exitword)
@@ -78,6 +70,11 @@ func initPrimitives(f *Forth) {
 	f.DefineImmediate("[", lbracket)
 	f.DefineImmediate("]", rbracket)
 	f.DefinePrimitive("STATE", state)
+	f.DefinePrimitive("HERE", here)
+	f.DefinePrimitive("PAD", pad)
+	f.DefinePrimitive("ALLOT", allot)
+	f.DefinePrimitive(",", comma)
+	f.DefinePrimitive("C,", ccomma)
 	f.DefinePrimitive("CREATE", create)
 	f.DefinePrimitive("CONSTANT", constant)
 	f.DefinePrimitive("VARIABLE", variable)
@@ -114,6 +111,12 @@ func initPrimitives(f *Forth) {
 	f.DefineImmediate("LOOP", loopword)
 	f.DefineImmediate("+LOOP", plusloopword)
 	f.DefineImmediate("LEAVE", leaveword)
+
+	f.DefinePrimitive("DEPTH", depth)
+	f.DefinePrimitive("BASE", base)
+	f.DefinePrimitive("DP", dpaddr)
+	f.DefinePrimitive("SPAN", span)
+	f.DefinePrimitive("SOURCE", source)
 }
 
 var dup = func(f *Forth) {
@@ -161,34 +164,6 @@ var rfetch = func(f *Forth) {
 	f.DSPush(v)
 }
 
-var twoswap = func(f *Forth) {
-	a := f.DSPop()
-	b := f.DSPop()
-	c := f.DSPop()
-	d := f.DSPop()
-	f.DSPush(b)
-	f.DSPush(a)
-	f.DSPush(d)
-	f.DSPush(c)
-}
-
-var twover = func(f *Forth) {
-	a := f.DSPop()
-	b := f.DSPop()
-	c := f.DSPop()
-	d := f.DSPop()
-	f.DSPush(b)
-	f.DSPush(a)
-	f.DSPush(d)
-	f.DSPush(c)
-	f.DSPush(b)
-	f.DSPush(a)
-}
-
-var depth = func(f *Forth) {
-	f.DSPush(Cell(len(f.DS)))
-}
-
 var fetch = func(f *Forth) {
 	addr := int(f.DSPop())
 	val := f.Fetch(addr)
@@ -211,56 +186,6 @@ var cstore = func(f *Forth) {
 	addr := int(f.DSPop())
 	val := byte(f.DSPop())
 	f.CStore(addr, val)
-}
-
-var fill = func(f *Forth) {
-	val := byte(f.DSPop())
-	length := int(f.DSPop())
-	addr := int(f.DSPop())
-	for i := 0; i < length; i++ {
-		f.CStore(addr+i, val)
-	}
-}
-
-var cmove = func(f *Forth) {
-	length := int(f.DSPop())
-	src := int(f.DSPop())
-	dst := int(f.DSPop())
-	for i := 0; i < length; i++ {
-		f.CStore(dst+i, f.CFetch(src+i))
-	}
-}
-
-var cmover = func(f *Forth) {
-	length := int(f.DSPop())
-	src := int(f.DSPop())
-	dst := int(f.DSPop())
-	for i := length - 1; i >= 0; i-- {
-		f.CStore(dst+i, f.CFetch(src+i))
-	}
-}
-
-var here = func(f *Forth) {
-	f.DSPush(Cell(f.Here()))
-}
-
-var pad = func(f *Forth) {
-	f.DSPush(Cell(f.Here() + 68))
-}
-
-var allot = func(f *Forth) {
-	n := int(f.DSPop())
-	f.Allot(n)
-}
-
-var comma = func(f *Forth) {
-	val := f.DSPop()
-	f.Comma(val)
-}
-
-var ccomma = func(f *Forth) {
-	val := byte(f.DSPop())
-	f.CComma(val)
 }
 
 var plus = func(f *Forth) {
@@ -430,19 +355,6 @@ var bye = func(f *Forth) {
 	f.Running = false
 }
 
-var dots = func(f *Forth) {
-	f.EmitStr("<")
-	depth := len(f.DS)
-	for i := depth - 1; i >= 0; i-- {
-		s := strconv.FormatInt(int64(f.DS[i]), 10)
-		f.EmitStr(s)
-		if i > 0 {
-			f.Emit(' ')
-		}
-	}
-	f.EmitStr(">")
-}
-
 var word = func(f *Forth) {
 	delim := byte(f.DSPop())
 	for f.IN < len(f.TIB) && f.TIB[f.IN] == delim {
@@ -521,6 +433,70 @@ var expect = func(f *Forth) {
 	f.Store(1000, Cell(count))
 }
 
+var dots = func(f *Forth) {
+	f.EmitStr("<")
+	depth := len(f.DS)
+	for i := depth - 1; i >= 0; i-- {
+		s := strconv.FormatInt(int64(f.DS[i]), 10)
+		f.EmitStr(s)
+		if i > 0 {
+			f.Emit(' ')
+		}
+	}
+	f.EmitStr(">")
+}
+
+var twoswap = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	c := f.DSPop()
+	d := f.DSPop()
+	f.DSPush(b)
+	f.DSPush(a)
+	f.DSPush(d)
+	f.DSPush(c)
+}
+
+var twover = func(f *Forth) {
+	a := f.DSPop()
+	b := f.DSPop()
+	c := f.DSPop()
+	d := f.DSPop()
+	f.DSPush(b)
+	f.DSPush(a)
+	f.DSPush(d)
+	f.DSPush(c)
+	f.DSPush(b)
+	f.DSPush(a)
+}
+
+var fill = func(f *Forth) {
+	val := byte(f.DSPop())
+	length := int(f.DSPop())
+	addr := int(f.DSPop())
+	for i := 0; i < length; i++ {
+		f.CStore(addr+i, val)
+	}
+}
+
+var cmove = func(f *Forth) {
+	length := int(f.DSPop())
+	src := int(f.DSPop())
+	dst := int(f.DSPop())
+	for i := 0; i < length; i++ {
+		f.CStore(dst+i, f.CFetch(src+i))
+	}
+}
+
+var cmover = func(f *Forth) {
+	length := int(f.DSPop())
+	src := int(f.DSPop())
+	dst := int(f.DSPop())
+	for i := length - 1; i >= 0; i-- {
+		f.CStore(dst+i, f.CFetch(src+i))
+	}
+}
+
 var evaluate = func(f *Forth) {
 	len := int(f.DSPop())
 	addr := int(f.DSPop())
@@ -537,21 +513,11 @@ var evaluate = func(f *Forth) {
 	f.IN = savedIN
 }
 
-var base = func(f *Forth) {
-	f.DSPush(Cell(f.Base))
-}
-
-var dpaddr = func(f *Forth) {
-	f.DSPush(Cell(f.DP))
-}
-
-var span = func(f *Forth) {
-	f.DSPush(1000)
-}
-
-var source = func(f *Forth) {
-	f.DSPush(Cell(len(f.TIB)))
-	f.DSPush(0)
+var includedWord = func(f *Forth) {
+	len := int(f.DSPop())
+	addr := int(f.DSPop())
+	name := string(f.Memory[addr : addr+len])
+	f.LoadFile(name)
 }
 
 var lit = func(f *Forth) {
@@ -608,6 +574,29 @@ var state = func(f *Forth) {
 	} else {
 		f.DSPush(0)
 	}
+}
+
+var here = func(f *Forth) {
+	f.DSPush(Cell(f.Here()))
+}
+
+var pad = func(f *Forth) {
+	f.DSPush(Cell(f.Here() + 68))
+}
+
+var allot = func(f *Forth) {
+	n := int(f.DSPop())
+	f.Allot(n)
+}
+
+var comma = func(f *Forth) {
+	val := f.DSPop()
+	f.Comma(val)
+}
+
+var ccomma = func(f *Forth) {
+	val := byte(f.DSPop())
+	f.CComma(val)
 }
 
 var create = func(f *Forth) {
@@ -941,4 +930,25 @@ var leaveword = func(f *Forth) {
 	}
 	xt, _ := f.FindXT("UNLOOP")
 	f.compileList = append(f.compileList, Cell(xt))
+}
+
+var depth = func(f *Forth) {
+	f.DSPush(Cell(len(f.DS)))
+}
+
+var base = func(f *Forth) {
+	f.DSPush(Cell(f.Base))
+}
+
+var dpaddr = func(f *Forth) {
+	f.DSPush(Cell(f.DP))
+}
+
+var span = func(f *Forth) {
+	f.DSPush(1000)
+}
+
+var source = func(f *Forth) {
+	f.DSPush(Cell(len(f.TIB)))
+	f.DSPush(0)
 }
