@@ -1,0 +1,10 @@
+: FACTORIAL ( n -- n! )
+  DUP 1 >
+  IF
+    DUP 1 - RECURSE *
+  THEN
+;
+
+: TEST-FACTORIAL
+  10 FACTORIAL . CR
+;

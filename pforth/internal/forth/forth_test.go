@@ -534,6 +534,29 @@ func TestNestedDOLOOP(t *testing.T) {
 	}
 }
 
+func TestSIEVE(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("8190 CONSTANT SIZE")
+	f.InterpretLine("VARIABLE FLAGS SIZE 1+ ALLOT")
+	f.InterpretLine(": SETUP-FLAGS")
+	f.InterpretLine("  SIZE 0 DO 1 FLAGS I + C! LOOP ;")
+	f.InterpretLine(": SIEVE")
+	f.InterpretLine("  SETUP-FLAGS 0")
+	f.InterpretLine("  SIZE 0 DO")
+	f.InterpretLine("    FLAGS I + C@ IF")
+	f.InterpretLine("      I I + 3 + DUP I +")
+	f.InterpretLine("      BEGIN DUP SIZE < WHILE")
+	f.InterpretLine("        DUP FLAGS + 0 SWAP C! OVER +")
+	f.InterpretLine("      REPEAT DROP DROP 1+")
+	f.InterpretLine("    THEN")
+	f.InterpretLine("  LOOP . ;")
+	f.InterpretLine("SIEVE")
+	output := out.String()
+	if !strings.Contains(output, "1899") {
+		t.Errorf("SIEVE: expected 1899 primes, got %q", output)
+	}
+}
+
 func TestFACTORIAL(t *testing.T) {
 	f, out := newTestForth("")
 	f.InterpretLine(": FACTORIAL")
