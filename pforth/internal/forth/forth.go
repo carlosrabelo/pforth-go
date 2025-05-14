@@ -57,6 +57,7 @@ func New(input io.Reader, output io.Writer) *Forth {
 		Loaded:      make(map[string]bool),
 	}
 	initPrimitives(f)
+	f.requireModule("CORE")
 	return f
 }
 
@@ -350,4 +351,3 @@ func (f *Forth) interpretLoop() {
 		}
 	}
 }
-

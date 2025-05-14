@@ -73,6 +73,48 @@ func TestStackOVER(t *testing.T) {
 	}
 }
 
+func TestStackROT(t *testing.T) {
+	f, _ := newTestForth("")
+	// ROT: ( a b c -- b c a )
+	// DS in:  [1, 2, 3]  (TOS=3)
+	// pop: a=3, b=2, c=1; push: b=2, a=3, c=1
+	// DS out: [2, 3, 1]  (TOS=1)
+	f.DSPush(1)
+	f.DSPush(2)
+	f.DSPush(3)
+	exec(f, "ROT")
+	if f.DSPop() != 1 {
+		t.Errorf("ROT: TOS should be 1")
+	}
+	if f.DSPop() != 3 {
+		t.Errorf("ROT: NOS should be 3")
+	}
+	if f.DSPop() != 2 {
+		t.Errorf("ROT: 3RD should be 2")
+	}
+}
+
+func TestStackNROT(t *testing.T) {
+	f, _ := newTestForth("")
+	// -ROT: ( a b c -- c a b )
+	// DS in:  [1, 2, 3]  (TOS=3)
+	// pop: a=3, b=2, c=1; push: a=3, c=1, b=2
+	// DS out: [3, 1, 2]  (TOS=2)
+	f.DSPush(1)
+	f.DSPush(2)
+	f.DSPush(3)
+	exec(f, "-ROT")
+	if f.DSPop() != 2 {
+		t.Errorf("-ROT: TOS should be 2")
+	}
+	if f.DSPop() != 1 {
+		t.Errorf("-ROT: NOS should be 1")
+	}
+	if f.DSPop() != 3 {
+		t.Errorf("-ROT: 3RD should be 3")
+	}
+}
+
 func TestStackQDUP(t *testing.T) {
 	f, _ := newTestForth("")
 	f.DSPush(0)
@@ -115,6 +157,62 @@ func TestStackRFetch(t *testing.T) {
 	}
 	if len(f.RS) != 1 {
 		t.Errorf("R@: RS should still have 1 item")
+	}
+}
+
+func TestStackNIP(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(10)
+	f.DSPush(20)
+	exec(f, "NIP")
+	if f.DSPop() != 20 {
+		t.Errorf("NIP: expected 20, got %d", f.DSPop())
+	}
+}
+
+func TestStackTUCK(t *testing.T) {
+	f, _ := newTestForth("")
+	// TUCK: ( a b -- b a b )
+	// DS in: [10, 20] (TOS=20)
+	// pop: a=20, b=10; push: a=20, b=10, a=20
+	// DS out: [20, 10, 20] (TOS=20)
+	f.DSPush(10)
+	f.DSPush(20)
+	exec(f, "TUCK")
+	if f.DSPop() != 20 {
+		t.Errorf("TUCK: TOS should be 20")
+	}
+	if f.DSPop() != 10 {
+		t.Errorf("TUCK: NOS should be 10")
+	}
+	if f.DSPop() != 20 {
+		t.Errorf("TUCK: 3RD should be 20")
+	}
+}
+
+func TestStack2DUP(t *testing.T) {
+	f, _ := newTestForth("")
+	// 2DUP: ( a b -- a b a b )
+	f.DSPush(1)
+	f.DSPush(2)
+	exec(f, "2DUP")
+	// DS: [1, 2, 1, 2]  (TOS=2)
+	tos := f.DSPop()  // 2
+	nos := f.DSPop()  // 1
+	thd := f.DSPop()  // 2
+	fou := f.DSPop()  // 1
+	if tos != 2 || nos != 1 || thd != 2 || fou != 1 {
+		t.Errorf("2DUP: expected 2 1 2 1")
+	}
+}
+
+func TestStack2DROP(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(1)
+	f.DSPush(2)
+	exec(f, "2DROP")
+	if len(f.DS) != 0 {
+		t.Errorf("2DROP: DS should be empty")
 	}
 }
 
@@ -183,6 +281,19 @@ func TestArithmetic(t *testing.T) {
 		{"+", "+", []Cell{10, 20}, 30},
 		{"-", "-", []Cell{20, 5}, 15},
 		{"*", "*", []Cell{6, 7}, 42},
+		{"1+", "1+", []Cell{41}, 42},
+		{"1-", "1-", []Cell{42}, 41},
+		{"2*", "2*", []Cell{21}, 42},
+		{"2/", "2/", []Cell{42}, 21},
+		{"NEGATE", "NEGATE", []Cell{42}, -42},
+		{"ABS positive", "ABS", []Cell{42}, 42},
+		{"ABS negative", "ABS", []Cell{-42}, 42},
+		{"MIN a<b", "MIN", []Cell{3, 7}, 3},
+		{"MIN a>b", "MIN", []Cell{7, 3}, 3},
+		{"MAX a<b", "MAX", []Cell{3, 7}, 7},
+		{"MAX a>b", "MAX", []Cell{7, 3}, 7},
+		{"/", "/", []Cell{10, 3}, 3},
+		{"MOD", "MOD", []Cell{10, 3}, 1},
 	}
 
 	for _, tt := range tests {
@@ -214,19 +325,35 @@ func TestDIVMOD(t *testing.T) {
 	}
 }
 
+func TestDivisionByZero(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(5)   // dividend
+	f.DSPush(0)   // divisor
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic for division by zero")
+		}
+	}()
+	exec(f, "/")
+}
+
 func TestComparison(t *testing.T) {
 	tests := []struct {
-		name string
-		word string
-		push []Cell
-		want Cell
+		name   string
+		word   string
+		push   []Cell
+		want   Cell
 	}{
 		{"=", "=", []Cell{5, 5}, -1},
 		{"= false", "=", []Cell{5, 6}, 0},
+		{"<> true", "<>", []Cell{5, 6}, -1},
+		{"<> false", "<>", []Cell{5, 5}, 0},
 		{"< true", "<", []Cell{3, 5}, -1},
 		{"< false", "<", []Cell{5, 3}, 0},
 		{"> true", ">", []Cell{5, 3}, -1},
 		{"> false", ">", []Cell{3, 5}, 0},
+		{"0= zero", "0=", []Cell{0}, -1},
+		{"0= non-zero", "0=", []Cell{5}, 0},
 		{"AND", "AND", []Cell{3, 1}, 1},
 		{"OR", "OR", []Cell{1, 2}, 3},
 		{"XOR", "XOR", []Cell{3, 1}, 2},
@@ -273,6 +400,21 @@ func TestMemoryCStoreCFetch(t *testing.T) {
 	}
 }
 
+func TestMemoryAddStore(t *testing.T) {
+	f, _ := newTestForth("")
+	f.DSPush(100)
+	f.DSPush(4000)
+	exec(f, "!")     // mem[4000] = 100
+	f.DSPush(50)
+	f.DSPush(4000)
+	exec(f, "+!")    // mem[4000] += 50
+	f.DSPush(4000)
+	exec(f, "@")
+	if f.DSPop() != 150 {
+		t.Errorf("+!: expected 150, got %d", f.DSPop())
+	}
+}
+
 func TestMemoryFILL(t *testing.T) {
 	f, _ := newTestForth("")
 	f.DSPush(5000)
@@ -282,6 +424,21 @@ func TestMemoryFILL(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		if f.CFetch(5000+i) != 65 {
 			t.Errorf("FILL[%d]: expected 65", i)
+		}
+	}
+}
+
+func TestMemoryERASE(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 10; i++ {
+		f.CStore(6000+i, 0xFF)
+	}
+	f.DSPush(6000)
+	f.DSPush(10)
+	exec(f, "ERASE")
+	for i := 0; i < 10; i++ {
+		if f.CFetch(6000+i) != 0 {
+			t.Errorf("ERASE[%d]: expected 0", i)
 		}
 	}
 }
@@ -302,113 +459,48 @@ func TestMemoryCMOVE(t *testing.T) {
 	}
 }
 
-func TestCMOVE(t *testing.T) {
+func TestCOLON(t *testing.T) {
 	f, _ := newTestForth("")
-	for i := 0; i < 5; i++ {
-		f.CStore(8000+i, byte(i+10))
+	f.InterpretLine(": DOUBLE DUP + ;")
+	w, found := f.Lookup("DOUBLE")
+	if !found {
+		t.Fatal("DOUBLE not found after definition")
 	}
-	// Non-overlapping copy: src=8000, dst=8010, len=5
-	f.DSPush(8010)
-	f.DSPush(8000)
-	f.DSPush(5)
-	exec(f, "CMOVE")
-	for i := 0; i < 5; i++ {
-		if f.CFetch(8010+i) != byte(i+10) {
-			t.Errorf("CMOVE[%d]: expected %d", i, i+10)
-		}
+	if w.Type != WordColon {
+		t.Errorf("DOUBLE: expected colon type, got %v", w.Type)
 	}
 }
 
-func TestCMOVEOverlap(t *testing.T) {
-	f, _ := newTestForth("")
-	for i := 0; i < 5; i++ {
-		f.CStore(8000+i, byte(i+20))
-	}
-	// Forward src < dst: propagates first byte
-	f.DSPush(8001)
-	f.DSPush(8000)
-	f.DSPush(4)
-	exec(f, "CMOVE")
-	// After forward CMOVE with src<dst: all copied bytes get src[0]
-	if f.CFetch(8001) != 20 || f.CFetch(8002) != 20 {
-		t.Errorf("CMOVE fwd: expected first-byte propagation")
+func TestColonDefinitionAndExecution(t *testing.T) {
+	f2, out := newTestForth("")
+	f2.InterpretLine(": SQUARE DUP * ;")
+	f2.InterpretLine("5 SQUARE .")
+	if !strings.Contains(out.String(), "25") {
+		t.Errorf("SQUARE: expected 25, got %q", out.String())
 	}
 }
 
-func TestHexPrefix(t *testing.T) {
+func TestIFELSE(t *testing.T) {
 	f, out := newTestForth("")
-	f.InterpretLine("$FF .")
-	if !strings.Contains(out.String(), "255") {
-		t.Errorf("$FF: expected 255, got %q", out.String())
-	}
-}
-
-func TestBinaryPrefix(t *testing.T) {
-	f, out := newTestForth("")
-	f.InterpretLine("%1010 .")
-	if !strings.Contains(out.String(), "10") {
-		t.Errorf("%%1010: expected 10, got %q", out.String())
-	}
-}
-
-func TestEVALUATE(t *testing.T) {
-	f, out := newTestForth("")
-	// Store "2 3 + ." in memory
-	s := "2 3 + ."
-	addr := f.Here()
-	for i := 0; i < len(s); i++ {
-		f.CStore(addr+i, s[i])
-	}
-	f.DP = addr + len(s)
-	f.DSPush(Cell(addr))
-	f.DSPush(Cell(len(s)))
-	exec(f, "EVALUATE")
-	if !strings.Contains(out.String(), "5") {
-		t.Errorf("EVALUATE: expected '5' output, got %q", out.String())
-	}
-}
-
-func TestSPAN(t *testing.T) {
-	f, _ := newTestForth("hello\n")
-	f.DSPush(5000) // buffer address
-	f.DSPush(80)   // max length
-	f.InterpretLine("EXPECT")
-	exec(f, "SPAN", "@")
-	span := f.DSPop()
-	if span != 5 {
-		t.Errorf("SPAN: expected 5, got %d", span)
-	}
-}
-
-func TestABORT(t *testing.T) {
-	f, _ := newTestForth("")
-	f.State = true
-	f.DSPush(10)
-	f.Body = []Cell{1, 2, 3}
-	f.IP = 1
-	exec(f, "ABORT")
-	if f.State {
-		t.Errorf("ABORT: STATE should be false")
-	}
-	if len(f.DS) != 0 {
-		t.Errorf("ABORT: DS should be empty")
-	}
-}
-
-func TestBYE(t *testing.T) {
-	f, _ := newTestForth("")
-	exec(f, "BYE")
-	if f.Running {
-		t.Errorf("BYE should set Running to false")
-	}
-}
-
-func TestDOTS(t *testing.T) {
-	f, out := newTestForth("")
-	f.InterpretLine("1 2 3 .S")
+	f.InterpretLine(": TEST IF .\" YES\" ELSE .\" NO\" THEN ;")
+	f.InterpretLine("1 TEST")
+	f.InterpretLine("0 TEST")
 	output := out.String()
-	if !strings.Contains(output, "<") || !strings.Contains(output, ">") {
-		t.Errorf(".S: expected stack display with <>, got %q", output)
+	if !strings.Contains(output, "YES") {
+		t.Errorf("1 TEST should print YES, got %q", output)
+	}
+	if !strings.Contains(output, "NO") {
+		t.Errorf("0 TEST should print NO, got %q", output)
+	}
+}
+
+func TestBEGINUNTIL(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": COUNTDOWN BEGIN DUP . 1- DUP 0= UNTIL DROP ;")
+	f.InterpretLine("5 COUNTDOWN")
+	output := out.String()
+	if !strings.Contains(output, "5 4 3 2 1") {
+		t.Errorf("COUNTDOWN: expected 5 4 3 2 1, got %q", output)
 	}
 }
 
@@ -442,38 +534,14 @@ func TestNestedDOLOOP(t *testing.T) {
 	}
 }
 
-func TestIFELSE(t *testing.T) {
+func TestFACTORIAL(t *testing.T) {
 	f, out := newTestForth("")
-	f.InterpretLine(": TEST IF .\" YES\" ELSE .\" NO\" THEN ;")
-	f.InterpretLine("1 TEST")
-	f.InterpretLine("0 TEST")
+	f.InterpretLine(": FACTORIAL")
+	f.InterpretLine("  DUP 0= IF DROP 1 ELSE DUP 1- RECURSE * THEN ;")
+	f.InterpretLine("10 FACTORIAL .")
 	output := out.String()
-	if !strings.Contains(output, "YES") {
-		t.Errorf("1 TEST should print YES, got %q", output)
-	}
-	if !strings.Contains(output, "NO") {
-		t.Errorf("0 TEST should print NO, got %q", output)
-	}
-}
-
-func TestCOLON(t *testing.T) {
-	f, _ := newTestForth("")
-	f.InterpretLine(": DOUBLE DUP + ;")
-	w, found := f.Lookup("DOUBLE")
-	if !found {
-		t.Fatal("DOUBLE not found after definition")
-	}
-	if w.Type != WordColon {
-		t.Errorf("DOUBLE: expected colon type, got %v", w.Type)
-	}
-}
-
-func TestColonDefinitionAndExecution(t *testing.T) {
-	f2, out := newTestForth("")
-	f2.InterpretLine(": SQUARE DUP * ;")
-	f2.InterpretLine("5 SQUARE .")
-	if !strings.Contains(out.String(), "25") {
-		t.Errorf("SQUARE: expected 25, got %q", out.String())
+	if !strings.Contains(output, "3628800") {
+		t.Errorf("FACTORIAL(10): expected 3628800, got %q", output)
 	}
 }
 
@@ -542,6 +610,39 @@ func TestSQUOTECompile(t *testing.T) {
 	}
 }
 
+func TestEVALUATE(t *testing.T) {
+	f, out := newTestForth("")
+	// Store "2 3 + ." in memory
+	s := "2 3 + ."
+	addr := f.Here()
+	for i := 0; i < len(s); i++ {
+		f.CStore(addr+i, s[i])
+	}
+	f.DP = addr + len(s)
+	f.DSPush(Cell(addr))
+	f.DSPush(Cell(len(s)))
+	exec(f, "EVALUATE")
+	if !strings.Contains(out.String(), "5") {
+		t.Errorf("EVALUATE: expected '5' output, got %q", out.String())
+	}
+}
+
+func TestHexPrefix(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("$FF .")
+	if !strings.Contains(out.String(), "255") {
+		t.Errorf("$FF: expected 255, got %q", out.String())
+	}
+}
+
+func TestBinaryPrefix(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("%1010 .")
+	if !strings.Contains(out.String(), "10") {
+		t.Errorf("%%1010: expected 10, got %q", out.String())
+	}
+}
+
 func TestSTATEResetOnError(t *testing.T) {
 	f, out := newTestForth("")
 	f.InterpretLine(": TEST UNDEFINED ;")
@@ -553,13 +654,139 @@ func TestSTATEResetOnError(t *testing.T) {
 	}
 }
 
+func TestBYE(t *testing.T) {
+	f, _ := newTestForth("")
+	exec(f, "BYE")
+	if f.Running {
+		t.Errorf("BYE should set Running to false")
+	}
+}
+
+func TestSPAN(t *testing.T) {
+	f, _ := newTestForth("hello\n")
+	f.DSPush(5000) // buffer address
+	f.DSPush(80)   // max length
+	f.InterpretLine("EXPECT")
+	exec(f, "SPAN", "@")
+	span := f.DSPop()
+	if span != 5 {
+		t.Errorf("SPAN: expected 5, got %d", span)
+	}
+}
+
+func TestABORT(t *testing.T) {
+	f, _ := newTestForth("")
+	f.State = true
+	f.DSPush(10)
+	f.Body = []Cell{1, 2, 3}
+	f.IP = 1
+	exec(f, "ABORT")
+	if f.State {
+		t.Errorf("ABORT: STATE should be false")
+	}
+	if len(f.DS) != 0 {
+		t.Errorf("ABORT: DS should be empty")
+	}
+}
+
+func TestRECURSE(t *testing.T) {
+	f, out := newTestForth("")
+	// 5! = 120
+	f.InterpretLine(": FACT DUP 1 > IF DUP 1- FACT * THEN ;")
+	f.InterpretLine("5 FACT .")
+	if !strings.Contains(out.String(), "120") {
+		t.Errorf("FACT(5): expected 120, got %q", out.String())
+	}
+}
+
+func TestBEGINAGAIN(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": INF 0 BEGIN DUP . 1+ DUP 5 = UNTIL DROP ;")
+	f.InterpretLine("INF")
+	if !strings.Contains(out.String(), "0 1 2 3 4") {
+		t.Errorf("BEGIN/UNTIL: expected 0 1 2 3 4, got %q", out.String())
+	}
+}
+
+func TestWHILEREPEAT(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine(": TEST")
+	f.InterpretLine("  0")
+	f.InterpretLine("  BEGIN")
+	f.InterpretLine("    DUP . 1+")
+	f.InterpretLine("    DUP 5 <")
+	f.InterpretLine("  WHILE")
+	f.InterpretLine("  REPEAT")
+	f.InterpretLine("  DROP ;")
+	f.InterpretLine("TEST")
+	if !strings.Contains(out.String(), "0 1 2 3 4") {
+		t.Errorf("BEGIN/WHILE/REPEAT: expected 0 1 2 3 4, got %q", out.String())
+	}
+}
+
+func TestQUESTION(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("VARIABLE X")
+	f.InterpretLine("42 X !")
+	f.InterpretLine("X ?")
+	if !strings.Contains(out.String(), "42") {
+		t.Errorf("?: expected 42, got %q", out.String())
+	}
+}
+
+func TestDOTS(t *testing.T) {
+	f, out := newTestForth("")
+	f.InterpretLine("1 2 3 .S")
+	output := out.String()
+	if !strings.Contains(output, "<") || !strings.Contains(output, ">") {
+		t.Errorf(".S: expected stack display with <>, got %q", output)
+	}
+}
+
+func TestCMOVE(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 5; i++ {
+		f.CStore(8000+i, byte(i+10))
+	}
+	// Non-overlapping copy: src=8000, dst=8010, len=5
+	f.DSPush(8010)
+	f.DSPush(8000)
+	f.DSPush(5)
+	exec(f, "CMOVE")
+	for i := 0; i < 5; i++ {
+		if f.CFetch(8010+i) != byte(i+10) {
+			t.Errorf("CMOVE[%d]: expected %d", i, i+10)
+		}
+	}
+}
+
+func TestCMOVEOverlap(t *testing.T) {
+	f, _ := newTestForth("")
+	for i := 0; i < 5; i++ {
+		f.CStore(8000+i, byte(i+20))
+	}
+	// Forward src < dst: propagates first byte
+	f.DSPush(8001)
+	f.DSPush(8000)
+	f.DSPush(4)
+	exec(f, "CMOVE")
+	// After forward CMOVE with src<dst: all copied bytes get src[0]
+	if f.CFetch(8001) != 20 || f.CFetch(8002) != 20 {
+		t.Errorf("CMOVE fwd: expected first-byte propagation")
+	}
+}
+
 func TestInterrupt(t *testing.T) {
 	f, _ := newTestForth("")
-	atomic.StoreInt32(&f.Interrupted, 1)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("expected interrupt")
-		}
+	f.InterpretLine(": INFLOOP 0 BEGIN 1+ AGAIN ;")
+	done := make(chan struct{})
+	go func() {
+		defer func() { recover(); close(done) }()
+		exec(f, "INFLOOP")
 	}()
-	f.InterpretLine("0")
+	atomic.StoreInt32(&f.Interrupted, 1)
+	<-done
+	if len(f.DS) != 0 {
+		t.Errorf("expected empty stack after interrupt")
+	}
 }
